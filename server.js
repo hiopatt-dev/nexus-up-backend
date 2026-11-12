@@ -36,11 +36,10 @@ app.get('/api/balance/:telegramId', async (req, res) => {
       user = new User({ telegramId, balance: 1000 });
       await user.save();
     }
-    res.json({ success: true, balance: user.balance });
+    res.json{ success: true, balance: user.balance });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
 
 // Создание счета и отправка прямо в чат игроку
 app.post('/api/create-invoice', async (req, res) => {
