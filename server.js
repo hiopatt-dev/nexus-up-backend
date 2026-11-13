@@ -7,10 +7,10 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Данные из переменных окружения на Render
+// Переменные из настроек Render
 const MONGO_URI = process.env.MONGO_URI;
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_ID = process.env.ADMIN_ID; // Твой Telegram ID для уведомлений о выводе
+const ADMIN_ID = process.env.ADMIN_ID; // Твой Telegram ID для заявок на вывод
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('MongoDB подключена'))
@@ -19,11 +19,11 @@ mongoose.connect(MONGO_URI)
 // Схема пользователя
 const UserSchema = new mongoose.Schema({
     telegramId: { type: String, required: true, unique: true },
-    balance: { type: Number, default: 1000 } // Стартовый бонус для тестов
+    balance: { type: Number, default: 1000 } // Стартовый баланс для тестов
 });
 const User = mongoose.model('User', UserSchema);
 
-// Схема заявок на вывод (защита от дублей)
+// Схема заявок на вывод
 const WithdrawalSchema = new mongoose.Schema({
     telegramId: String,
     amount: Number,
@@ -56,7 +56,6 @@ app.post('/api/upgrade', async (req, res) => {
             return res.json({ success: false, error: 'Недостаточно средств' });
         }
 
-        // Проверка шанса победы
         const randomRoll = Math.random() * 100;
         const isWin = randomRoll <= winChance;
         
@@ -65,7 +64,7 @@ app.post('/api/upgrade', async (req, res) => {
             payout = Math.floor(amount * multiplier);
             user.balance += (payout - amount); // Чистый выигрыш
         } else {
-            user.balance -= amount; // Проигрыш ставки
+            user.balance -= amount; // Списание ставки при проигрыше
         }
 
         await user.save();
@@ -75,25 +74,31 @@ app.post('/api/upgrade', async (req, res) => {
     }
 });
 
-// Создание счета на пополнение через StaticGram
+// Создание счета на пополнение через официальный Telegram Bot API (XTR)
 app.post('/api/create-invoice', async (req, res) => {
     try {
         const { telegramId, amount } = req.body;
         
-        const response = await axios.post('https://api.staticgram.top/v1/createInvoice', {
-            bot_token: BOT_TOKEN,
-            user_id: telegramId,
-            amount: amount,
-            currency: 'XTR'
-        }, { headers: { 'Authorization': `Bearer ${BOT_TOKEN}` } });
+        const response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, {
+            title: "Пополнение баланса NexusUp",
+            description: `Пополнение счета на ${amount} Telegram Stars`,
+            payload: `deposit_${telegramId}_${Date.now()}`,
+            currency: "XTR",
+            prices: [{ label: "Звезды", amount: parseInt(amount) }]
+        });
 
-        res.json({ success: true, data: response.data });
+        if (response.data && response.data.result) {
+            res.json({ success: true, data: { invoice_url: response.data.result } });
+        } else {
+            res.json({ success: false, error: 'Не удалось создать ссылку на оплату' });
+        }
     } catch (err) {
-        res.json({ success: false, error: 'Ошибка создания инвойса' });
+        console.log('Ошибка инвойса:', err.response?.data || err.message);
+        res.json({ success: false, error: 'Ошибка создания инвойса в Telegram' });
     }
 });
 
-// Запрос на вывод (списывает баланс сразу и шлет тебе уведомление в Telegram)
+// Запрос на вывод (моментальное списание + уведомление админу)
 app.post('/api/withdraw', async (req, res) => {
     try {
         const { telegramId, amount } = req.body;
@@ -111,10 +116,10 @@ app.post('/api/withdraw', async (req, res) => {
         user.balance -= amount;
         await user.save();
 
-        // Сохраняем заявку в базу
+        // Сохраняем заявку
         const withdrawal = await Withdrawal.create({ telegramId, amount, status: 'pending' });
 
-        // Отправляем тебе в личку уведомление
+        // Шлем уведомление тебе в личку
         const message = `🔔 **Новая заявка на вывод!**\n\n🆔 Юзер: \`${telegramId}\`\n⭐ Сумма: **${amount} звезд**\n📌 ID заявки: \`${withdrawal._id}\``;
         
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -131,4 +136,3 @@ app.post('/api/withdraw', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
-    
