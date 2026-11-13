@@ -29,12 +29,10 @@ const WithdrawalSchema = new mongoose.Schema({
 });
 const Withdrawal = mongoose.model('Withdrawal', WithdrawalSchema);
 
-// Главная страница бэкенда
 app.get('/', (req, res) => {
     res.send('NexusUp Backend is running successfully! 🚀');
 });
 
-// Получить баланс
 app.get('/api/balance/:telegramId', async (req, res) => {
     try {
         const { telegramId } = req.params;
@@ -48,7 +46,6 @@ app.get('/api/balance/:telegramId', async (req, res) => {
     }
 });
 
-// Игровая логика / Рулетка
 app.post('/api/upgrade', async (req, res) => {
     try {
         const { telegramId, amount, multiplier, winChance } = req.body;
@@ -76,14 +73,12 @@ app.post('/api/upgrade', async (req, res) => {
     }
 });
 
-// Создание инвойса через официальные методы StaticGram / Telegram Bot API
 app.post('/api/create-invoice', async (req, res) => {
     try {
         const { telegramId, amount } = req.body;
         
         let response;
         try {
-            // Пробуем метод StaticGram со скриншота документации
             response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createGramInvoiceLink`, {
                 title: "Пополнение баланса NexusUp",
                 description: `Пополнение счета на ${amount} Telegram Stars`,
@@ -92,7 +87,6 @@ app.post('/api/create-invoice', async (req, res) => {
                 prices: [{ label: "Звезды", amount: parseInt(amount) }]
             });
         } catch (e) {
-            // Запасной вариант на случай стандратного API
             response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, {
                 title: "Пополнение баланса NexusUp",
                 description: `Пополнение счета на ${amount} Telegram Stars`,
@@ -113,7 +107,6 @@ app.post('/api/create-invoice', async (req, res) => {
     }
 });
 
-// Запрос на вывод
 app.post('/api/withdraw', async (req, res) => {
     try {
         const { telegramId, amount } = req.body;
