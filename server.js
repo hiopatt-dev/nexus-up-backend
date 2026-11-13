@@ -12,8 +12,8 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = process.env.ADMIN_ID;
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('MongoDB подключена'))
-    .catch(err => console.error('Ошибка MongoDB:', err));
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB error:', err));
 
 const UserSchema = new mongoose.Schema({
     telegramId: { type: String, required: true, unique: true },
@@ -30,7 +30,7 @@ const WithdrawalSchema = new mongoose.Schema({
 const Withdrawal = mongoose.model('Withdrawal', WithdrawalSchema);
 
 app.get('/', (req, res) => {
-    res.send('NexusUp Backend is running successfully! 🚀');
+    res.send('NexusUp Backend is running successfully!');
 });
 
 app.get('/api/balance/:telegramId', async (req, res) => {
@@ -52,7 +52,7 @@ app.post('/api/upgrade', async (req, res) => {
         
         let user = await User.findOne({ telegramId });
         if (!user || user.balance < amount) {
-            return res.json({ success: false, error: 'Недостаточно средств' });
+            return res.json({ success: false, error: 'Not enough balance' });
         }
 
         const randomRoll = Math.random() * 100;
@@ -80,41 +80,40 @@ app.post('/api/create-invoice', async (req, res) => {
         let response;
         try {
             response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createGramInvoiceLink`, {
-                title: "Пополнение баланса NexusUp",
-                description: `Пополнение счета на ${amount} Telegram Stars`,
+                title: "NexusUp Balance Top Up",
+                description: `Add ${amount} Telegram Stars`,
                 payload: `deposit_${telegramId}_${Date.now()}`,
                 currency: "XTR",
-                prices: [{ label: "Звезды", amount: parseInt(amount) }]
+                prices: [{ label: "Stars", amount: parseInt(amount) }]
             });
         } catch (e) {
             response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, {
-                title: "Пополнение баланса NexusUp",
-                description: `Пополнение счета на ${amount} Telegram Stars`,
+                title: "NexusUp Balance Top Up",
+                description: `Add ${amount} Telegram Stars`,
                 payload: `deposit_${telegramId}_${Date.now()}`,
                 currency: "XTR",
-                prices: [{ label: "Звезды", amount: parseInt(amount) }]
+                prices: [{ label: "Stars", amount: parseInt(amount) }]
             });
         }
 
         if (response.data && response.data.result) {
             res.json({ success: true, data: { invoice_url: response.data.result } });
         } else {
-            res.json({ success: false, error: 'Не удалось создать ссылку на оплату' });
+            res.json({ success: false, error: 'Failed to create invoice' });
         }
     } catch (err) {
-        console.log('Ошибка инвойса:', err.response?.data || err.message);
-        res.json({ success: false, error: 'Ошибка создания инвойса' });
+        res.json({ success: false, error: 'Invoice creation error' });
     }
 });
 
 app.post('/api/withdraw', async (req, res) => {
     try {
         const { telegramId, amount } = req.body;
-        if (amount < 1) return res.json({ success: false, error: 'Некорректная сумма' });
+        if (amount < 1) return res.json({ success: false, error: 'Invalid amount' });
 
         let user = await User.findOne({ telegramId });
         if (!user || user.balance < amount) {
-            return res.json({ success: false, error: 'Недостаточно звезд на балансе' });
+            return res.json({ success: false, error: 'Insufficient funds' });
         }
 
         user.balance -= amount;
@@ -122,13 +121,11 @@ app.post('/api/withdraw', async (req, res) => {
 
         const withdrawal = await Withdrawal.create({ telegramId, amount, status: 'pending' });
         
-        const message = `🔔 **Новая заявка на вывод!**\n\n🆔 Юзер: \`${telegramId}\`\n⭐ Сумма: **${amount} звезд**\n📌 ID заявки: \`${withdrawal._id}\``;
-        
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: ADMIN_ID,
-            text: message,
+            text: `New withdrawal request:\nUser: ${telegramId}\nAmount: ${amount} stars`,
             parse_mode: 'Markdown'
-        }).catch(e => console.log('Ошибка отправки админу:', e.message));
+        }).catch(() => {});
 
         res.json({ success: true, newBalance: user.balance });
     } catch (err) {
@@ -137,4 +134,5 @@ app.post('/api/withdraw', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
