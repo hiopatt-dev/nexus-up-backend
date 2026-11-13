@@ -1,11 +1,89 @@
-// Создание инвойса через методы StaticGram (createGramInvoiceLink / createInvoiceLink)
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const axios = require('axios');
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+const MONGO_URI = process.env.MONGO_URI;
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_ID = process.env.ADMIN_ID;
+
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('MongoDB подключена'))
+    .catch(err => console.error('Ошибка MongoDB:', err));
+
+const UserSchema = new mongoose.Schema({
+    telegramId: { type: String, required: true, unique: true },
+    balance: { type: Number, default: 1000 }
+});
+const User = mongoose.model('User', UserSchema);
+
+const WithdrawalSchema = new mongoose.Schema({
+    telegramId: String,
+    amount: Number,
+    status: { type: String, default: 'pending' },
+    createdAt: { type: Date, default: Date.now }
+});
+const Withdrawal = mongoose.model('Withdrawal', WithdrawalSchema);
+
+// Главная страница бэкенда
+app.get('/', (req, res) => {
+    res.send('NexusUp Backend is running successfully! 🚀');
+});
+
+// Получить баланс
+app.get('/api/balance/:telegramId', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        let user = await User.findOne({ telegramId });
+        if (!user) {
+            user = await User.create({ telegramId, balance: 1000 });
+        }
+        res.json({ success: true, balance: user.balance });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Игровая логика / Рулетка
+app.post('/api/upgrade', async (req, res) => {
+    try {
+        const { telegramId, amount, multiplier, winChance } = req.body;
+        
+        let user = await User.findOne({ telegramId });
+        if (!user || user.balance < amount) {
+            return res.json({ success: false, error: 'Недостаточно средств' });
+        }
+
+        const randomRoll = Math.random() * 100;
+        const isWin = randomRoll <= winChance;
+        
+        let payout = 0;
+        if (isWin) {
+            payout = Math.floor(amount * multiplier);
+            user.balance += (payout - amount);
+        } else {
+            user.balance -= amount;
+        }
+
+        await user.save();
+        res.json({ success: true, win: isWin, newBalance: user.balance, payout });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Создание инвойса через официальные методы StaticGram / Telegram Bot API
 app.post('/api/create-invoice', async (req, res) => {
     try {
         const { telegramId, amount } = req.body;
         
-        // Пробуем метод расширения StaticGram, либо стандартный createInvoiceLink через их прокси/API
         let response;
         try {
+            // Пробуем метод StaticGram со скриншота документации
             response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createGramInvoiceLink`, {
                 title: "Пополнение баланса NexusUp",
                 description: `Пополнение счета на ${amount} Telegram Stars`,
@@ -14,7 +92,7 @@ app.post('/api/create-invoice', async (req, res) => {
                 prices: [{ label: "Звезды", amount: parseInt(amount) }]
             });
         } catch (e) {
-            // Если специфичный метод StaticGram вернет ошибку, шлем стандартный замолвленный метод
+            // Запасной вариант на случай стандратного API
             response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, {
                 title: "Пополнение баланса NexusUp",
                 description: `Пополнение счета на ${amount} Telegram Stars`,
@@ -30,7 +108,40 @@ app.post('/api/create-invoice', async (req, res) => {
             res.json({ success: false, error: 'Не удалось создать ссылку на оплату' });
         }
     } catch (err) {
-        console.log('Ошибка инвойса StaticGram:', err.response?.data || err.message);
+        console.log('Ошибка инвойса:', err.response?.data || err.message);
         res.json({ success: false, error: 'Ошибка создания инвойса' });
     }
 });
+
+// Запрос на вывод
+app.post('/api/withdraw', async (req, res) => {
+    try {
+        const { telegramId, amount } = req.body;
+        if (amount < 1) return res.json({ success: false, error: 'Некорректная сумма' });
+
+        let user = await User.findOne({ telegramId });
+        if (!user || user.balance < amount) {
+            return res.json({ success: false, error: 'Недостаточно звезд на балансе' });
+        }
+
+        user.balance -= amount;
+        await user.save();
+
+        const withdrawal = await Withdrawal.create({ telegramId, amount, status: 'pending' });
+        
+        const message = `🔔 **Новая заявка на вывод!**\n\n🆔 Юзер: \`${telegramId}\`\n⭐ Сумма: **${amount} звезд**\n📌 ID заявки: \`${withdrawal._id}\``;
+        
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            chat_id: ADMIN_ID,
+            text: message,
+            parse_mode: 'Markdown'
+        }).catch(e => console.log('Ошибка отправки админу:', e.message));
+
+        res.json({ success: true, newBalance: user.balance });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
