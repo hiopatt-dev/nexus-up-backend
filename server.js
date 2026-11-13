@@ -49,15 +49,15 @@ app.get('/api/balance/:telegramId', async (req, res) => {
 app.post('/api/upgrade', async (req, res) => {
     try {
         const { telegramId, amount, multiplier, winChance } = req.body;
-        
+
         let user = await User.findOne({ telegramId });
         if (!user || user.balance < amount) {
             return res.json({ success: false, error: 'Not enough balance' });
         }
 
         const randomRoll = Math.random() * 100;
-        const isWin = randomRoll <= winChance;
-        
+        const isWin = randomRoll < winChance;
+
         let payout = 0;
         if (isWin) {
             payout = Math.floor(amount * multiplier);
@@ -76,25 +76,15 @@ app.post('/api/upgrade', async (req, res) => {
 app.post('/api/create-invoice', async (req, res) => {
     try {
         const { telegramId, amount } = req.body;
-        
-        let response;
-        try {
-            response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createGramInvoiceLink`, {
-                title: "NexusUp Balance Top Up",
-                description: `Add ${amount} Telegram Stars`,
-                payload: `deposit_${telegramId}_${Date.now()}`,
-                currency: "XTR",
-                prices: [{ label: "Stars", amount: parseInt(amount) }]
-            });
-        } catch (e) {
-            response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, {
-                title: "NexusUp Balance Top Up",
-                description: `Add ${amount} Telegram Stars`,
-                payload: `deposit_${telegramId}_${Date.now()}`,
-                currency: "XTR",
-                prices: [{ label: "Stars", amount: parseInt(amount) }]
-            });
-        }
+
+        // Исправлено: используем стандартный метод Telegram Bot API createInvoiceLink для звёзд (XTR)
+        const response = await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/createInvoiceLink`, {
+            title: 'NexusUp Balance Top Up',
+            description: `Add ${amount} Telegram Stars`,
+            payload: `deposit_${telegramId}_${Date.now()}`,
+            currency: 'XTR',
+            prices: [{ label: 'Stars', amount: parseInt(amount) }]
+        });
 
         if (response.data && response.data.result) {
             res.json({ success: true, data: { invoice_url: response.data.result } });
@@ -102,7 +92,7 @@ app.post('/api/create-invoice', async (req, res) => {
             res.json({ success: false, error: 'Failed to create invoice' });
         }
     } catch (err) {
-        res.json({ success: false, error: 'Invoice creation error' });
+        res.status(500).json({ success: false, error: err.response?.data || err.message });
     }
 });
 
@@ -119,11 +109,11 @@ app.post('/api/withdraw', async (req, res) => {
         user.balance -= amount;
         await user.save();
 
-        const withdrawal = await Withdrawal.create({ telegramId, amount, status: 'pending' });
-        
+        await Withdrawal.create({ telegramId, amount, status: 'pending' });
+
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             chat_id: ADMIN_ID,
-            text: `New withdrawal request:\nUser: ${telegramId}\nAmount: ${amount} stars`,
+            text: `New withdrawal request:\nUser: ${telegramId}\nAmount: ${amount} stars.`,
             parse_mode: 'Markdown'
         }).catch(() => {});
 
@@ -135,4 +125,3 @@ app.post('/api/withdraw', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
