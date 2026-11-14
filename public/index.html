@@ -200,12 +200,28 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        .modal-video {
+        /* Контейнер для видео: жёстко обрезает всё лишнее по кругу */
+        .video-wrapper {
             width: 120px;
             height: 120px;
             border-radius: 50%;
-            object-fit: cover;
+            overflow: hidden;
             background: #0f0b1e;
+            border: 2px solid var(--accent-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .modal-video {
+            position: absolute;
+            width: 220%; /* Увеличиваем видео, чтобы кнопки телеграма ушли за края */
+            height: 220%;
+            object-fit: cover;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
 
         .modal-title {
@@ -260,7 +276,9 @@
 
     <div class="modal" id="resultModal">
         <div class="modal-content">
-            <video id="modalVideo" class="modal-video" autoplay loop muted playsinline></video>
+            <div class="video-wrapper">
+                <video id="modalVideo" class="modal-video" autoplay loop muted playsinline></video>
+            </div>
             <div class="modal-title" id="modalTitle">Результат</div>
             <div class="modal-desc" id="modalDesc">Описание события</div>
             <button class="btn-close-modal" onclick="closeModal()">Отлично</button>
