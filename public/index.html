@@ -110,6 +110,12 @@
             justify-content: center;
             position: relative;
             box-shadow: 0 0 25px var(--accent-glow);
+            animation: pulseGlow 3s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.3); }
+            100% { box-shadow: 0 0 35px rgba(139, 92, 246, 0.7); }
         }
 
         .wheel-center {
@@ -200,28 +206,23 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        /* Контейнер для видео: жёстко обрезает всё лишнее по кругу */
-        .video-wrapper {
-            width: 120px;
-            height: 120px;
+        .modal-icon-container {
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
-            overflow: hidden;
-            background: #0f0b1e;
+            background: radial-gradient(circle, #2e1065 0%, #110c24 100%);
             border: 2px solid var(--accent-purple);
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            font-size: 48px;
+            box-shadow: 0 0 20px var(--accent-glow);
+            animation: bounceIcon 1s infinite alternate ease-in-out;
         }
 
-        .modal-video {
-            position: absolute;
-            width: 220%; /* Увеличиваем видео, чтобы кнопки телеграма ушли за края */
-            height: 220%;
-            object-fit: cover;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+        @keyframes bounceIcon {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-6px); }
         }
 
         .modal-title {
@@ -276,9 +277,7 @@
 
     <div class="modal" id="resultModal">
         <div class="modal-content">
-            <div class="video-wrapper">
-                <video id="modalVideo" class="modal-video" autoplay loop muted playsinline></video>
-            </div>
+            <div class="modal-icon-container" id="modalIcon">🔥</div>
             <div class="modal-title" id="modalTitle">Результат</div>
             <div class="modal-desc" id="modalDesc">Описание события</div>
             <button class="btn-close-modal" onclick="closeModal()">Отлично</button>
@@ -305,10 +304,10 @@
         }
         fetchBalance();
 
-        function showModal(title, desc, videoSrc) {
+        function showModal(title, desc, emoji) {
             document.getElementById('modalTitle').innerText = title;
             document.getElementById('modalDesc').innerText = desc;
-            document.getElementById('modalVideo').src = videoSrc;
+            document.getElementById('modalIcon').innerText = emoji;
             document.getElementById('resultModal').classList.add('active');
             
             if (tg.HapticFeedback) {
@@ -332,22 +331,22 @@
             if (isWin) {
                 balance += bet;
                 document.getElementById('userBalance').innerText = balance;
-                showModal('Победа!', `Вы выиграли +${bet} ⭐`, 'videos/win.mp4');
+                showModal('Победа!', `Вы выиграли +${bet} ⭐`, '🔥');
             } else {
                 balance -= bet;
                 document.getElementById('userBalance').innerText = balance;
-                showModal('Проигрыш', `Ставка сгорела (-${bet} ⭐)`, 'videos/lose.mp4');
+                showModal('Проигрыш', `Ставка сгорела (-${bet} ⭐)`, '🕸️');
             }
         }
 
         function openDepositModal() {
             balance += 50;
             document.getElementById('userBalance').innerText = balance;
-            showModal('Пополнение успешно!', 'На ваш счёт зачислено +50 ⭐', 'videos/deposit.mp4');
+            showModal('Пополнение успешно!', 'На ваш счёт зачислено +50 ⭐', '💵');
         }
 
         function openWithdrawModal() {
-            showModal('Заявка создана', 'Вывод звёзд обрабатывается администратором', 'videos/withdraw.mp4');
+            showModal('Заявка создана', 'Вывод звёзд обрабатывается администратором', '🕶️');
         }
     </script>
 </body>
