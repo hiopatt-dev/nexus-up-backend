@@ -2,20 +2,335 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Up</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NexusUp</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #0f172a; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-top: 20px; }
-        button { background: #6366f1; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        :root {
+            --bg-color: #0f0b1e;
+            --card-bg: #1a1236;
+            --accent-purple: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.4);
+            --text-main: #ffffff;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-bottom: 40px;
+        }
+
+        .header {
+            background: var(--card-bg);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .balance-info h3 {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .balance-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-action {
+            background: linear-gradient(135deg, #7c3aed, #a78bfa);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px var(--accent-glow);
+            transition: transform 0.1s ease;
+        }
+
+        .btn-action:active {
+            transform: scale(0.95);
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 20px;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .wheel-container {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #2e1065 0%, #110c24 100%);
+            border: 4px solid var(--accent-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 0 25px var(--accent-glow);
+        }
+
+        .wheel-center {
+            font-size: 28px;
+            font-weight: 900;
+        }
+
+        .controls {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .input-group {
+            display: flex;
+            background: #110c24;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .input-group input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 12px 16px;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .btn-spin {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: transform 0.1s ease;
+        }
+
+        .btn-spin:active {
+            transform: scale(0.98);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 7, 20, 0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--accent-purple);
+            border-radius: 24px;
+            padding: 24px;
+            width: 100%;
+            max-width: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 16px;
+            box-shadow: 0 10px 40px rgba(139, 92, 246, 0.3);
+            animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-video {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #0f0b1e;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        .modal-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .btn-close-modal {
+            background: var(--accent-purple);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
-    <h1>Nexus Up 🚀</h1>
-    <div class="card">
-        <p>Баланс звёзд: <span id="balance">0</span> ⭐</p>
-        <button onclick="alert('Кликер работает!')">Кликнуть</button>
+
+    <div class="container">
+        <div class="header">
+            <div class="balance-info">
+                <h3>Баланс</h3>
+                <div class="balance-value"><span id="userBalance">100</span> ⭐</div>
+            </div>
+            <button class="btn-action" onclick="openDepositModal()">Пополнить</button>
+        </div>
+
+        <div class="game-card">
+            <div class="wheel-container" id="wheel">
+                <div class="wheel-center" id="multiplier">2.0x</div>
+            </div>
+
+            <div class="controls">
+                <div class="input-group">
+                    <input type="number" id="betAmount" value="10" min="1">
+                </div>
+                <button class="btn-spin" onclick="playGame()">Апгрейд ставки</button>
+            </div>
+        </div>
+
+        <button class="btn-action" style="width: 100%; padding: 14px;" onclick="openWithdrawModal()">Вывести звёзды</button>
     </div>
+
+    <div class="modal" id="resultModal">
+        <div class="modal-content">
+            <video id="modalVideo" class="modal-video" autoplay loop muted playsinline></video>
+            <div class="modal-title" id="modalTitle">Результат</div>
+            <div class="modal-desc" id="modalDesc">Описание события</div>
+            <button class="btn-close-modal" onclick="closeModal()">Отлично</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let balance = 100;
+
+        async function fetchBalance() {
+            try {
+                const res = await fetch('/api/balance?telegramId=' + (tg.initDataUnsafe?.user?.id || '1780244848'));
+                const data = await res.json();
+                if (data.balance !== undefined) {
+                    balance = data.balance;
+                    document.getElementById('userBalance').innerText = balance;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        fetchBalance();
+
+        function showModal(title, desc, videoSrc) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalDesc').innerText = desc;
+            document.getElementById('modalVideo').src = videoSrc;
+            document.getElementById('resultModal').classList.add('active');
+            
+            if (tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred(title.includes('Победа') ? 'success' : 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('resultModal').classList.remove('active');
+        }
+
+        function playGame() {
+            const bet = parseInt(document.getElementById('betAmount').value) || 10;
+            if (balance < bet) {
+                alert('Недостаточно звёзд!');
+                return;
+            }
+
+            const isWin = Math.random() > 0.5;
+            
+            if (isWin) {
+                balance += bet;
+                document.getElementById('userBalance').innerText = balance;
+                showModal('Победа!', `Вы выиграли +${bet} ⭐`, 'videos/win.mp4');
+            } else {
+                balance -= bet;
+                document.getElementById('userBalance').innerText = balance;
+                showModal('Проигрыш', `Ставка сгорела (-${bet} ⭐)`, 'videos/lose.mp4');
+            }
+        }
+
+        function openDepositModal() {
+            balance += 50;
+            document.getElementById('userBalance').innerText = balance;
+            showModal('Пополнение успешно!', 'На ваш счёт зачислено +50 ⭐', 'videos/deposit.mp4');
+        }
+
+        function openWithdrawModal() {
+            showModal('Заявка создана', 'Вывод звёзд обрабатывается администратором', 'videos/withdraw.mp4');
+        }
+    </script>
 </body>
 </html>
